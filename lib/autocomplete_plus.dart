@@ -1,5 +1,3 @@
-/// A Calculator.
-class Calculator {
-  /// Returns [value] plus 1.
-  int addOne(int value) => value + 1;
-}
+library autocomplete_plus;
+
+export 'package:autocomplete_plus/autocomplete_plus.dart';
