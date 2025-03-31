@@ -1,11 +1,28 @@
 name: autocomplete_plus
-description: "A Flutter package designed to provide efficient real-time suggestions via API-powered autocomplete along with seamless infinite scrolling, ideal for handling large datasets dynamically."
-version: 0.0.1
+description: "Effortless API-driven autocomplete for Flutter, featuring seamless infinite scrolling to handle massive datasets with ease."
+version: 0.1.0
+homepage: https://github.com/NamTranDinh/autocomplete_plus
+documentation: https://github.com/NamTranDinh/autocomplete_plus/blob/main/README.md
 repository: https://github.com/NamTranDinh/autocomplete_plus
+issue_tracker: https://github.com/NamTranDinh/autocomplete_plus/issues
+topics:
+  - autocomplete
+  - infinite-scroll
+  - api
+  - suggestion
+  - widget
+  - flutter
+keywords:
+  - autocomplete
+  - suggestion
+  - infinite scrolling
+  - API
+  - search
+  - dynamic
 
 environment:
-  sdk: ^3.6.0
-  flutter: ">=1.17.0"
+  sdk: '>=3.6.0 <4.0.0'
+  flutter: ">=3.7.0"
 
 dependencies:
   flutter:

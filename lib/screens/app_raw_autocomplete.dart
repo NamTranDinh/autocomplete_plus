@@ -16,13 +16,10 @@ class AppRawAutocomplete<T extends Object> extends StatefulWidget {
     this.textEditingController,
     this.initialValue,
   })  : assert(
-          fieldViewBuilder != null ||
-              (key != null &&
-                  focusNode != null &&
-                  textEditingController != null),
+          fieldViewBuilder != null || (key != null && focusNode != null && textEditingController != null),
           'Pass in a fieldViewBuilder, or otherwise create a separate field and pass in the FocusNode, TextEditingController, and a key. Use the key with RawAutocomplete.onFieldSubmitted.',
         ),
-        assert((focusNode == null) == (textEditingController == null)),
+        assert((focusNode == null) == (textEditingController == null), ''),
         assert(
           !(textEditingController != null && initialValue != null),
           'textEditingController and initialValue cannot be simultaneously defined.',
@@ -46,11 +43,6 @@ class AppRawAutocomplete<T extends Object> extends StatefulWidget {
 
   final TextEditingValue? initialValue;
 
-  static void onFieldSubmitted<T extends Object>(GlobalKey key) {
-    final rawAutocomplete = key.currentState! as _AppRawAutocompleteState<T>;
-    rawAutocomplete._onFieldSubmitted();
-  }
-
   static String defaultStringForOption(Object? option) {
     return option.toString();
   }
@@ -59,8 +51,7 @@ class AppRawAutocomplete<T extends Object> extends StatefulWidget {
   State<AppRawAutocomplete<T>> createState() => _AppRawAutocompleteState<T>();
 }
 
-class _AppRawAutocompleteState<T extends Object>
-    extends State<AppRawAutocomplete<T>> {
+class _AppRawAutocompleteState<T extends Object> extends State<AppRawAutocomplete<T>> {
   final _fieldKey = GlobalKey();
   final _optionsLayerLink = LayerLink();
   final _optionsViewController = OverlayPortalController(
@@ -71,27 +62,21 @@ class _AppRawAutocompleteState<T extends Object>
 
   TextEditingController get _textEditingController {
     return widget.textEditingController ??
-        (_internalTextEditingController ??= TextEditingController()
-          ..addListener(_onChangedField));
+        (_internalTextEditingController ??= TextEditingController()..addListener(_onChangedField));
   }
 
   FocusNode? _internalFocusNode;
 
   FocusNode get _focusNode {
-    return widget.focusNode ??
-        (_internalFocusNode ??= FocusNode()
-          ..addListener(_updateOptionsViewVisibility));
+    return widget.focusNode ?? (_internalFocusNode ??= FocusNode()..addListener(_updateOptionsViewVisibility));
   }
 
-  late final Map<Type, CallbackAction<Intent>> _actionMap =
-      <Type, CallbackAction<Intent>>{
-    AutocompletePreviousOptionIntent:
-        _AutocompleteCallbackAction<AutocompletePreviousOptionIntent>(
+  late final _actionMap = <Type, CallbackAction<Intent>>{
+    AutocompletePreviousOptionIntent: _AutocompleteCallbackAction<AutocompletePreviousOptionIntent>(
       onInvoke: _highlightPreviousOption,
       isEnabledCallback: () => _canShowOptionsView,
     ),
-    AutocompleteNextOptionIntent:
-        _AutocompleteCallbackAction<AutocompleteNextOptionIntent>(
+    AutocompleteNextOptionIntent: _AutocompleteCallbackAction<AutocompleteNextOptionIntent>(
       onInvoke: _highlightNextOption,
       isEnabledCallback: () => _canShowOptionsView,
     ),
@@ -105,14 +90,12 @@ class _AppRawAutocompleteState<T extends Object>
   final ValueNotifier<int> _highlightedOptionIndex = ValueNotifier<int>(0);
 
   static const _shortcuts = <ShortcutActivator, Intent>{
-    SingleActivator(LogicalKeyboardKey.arrowUp):
-        AutocompletePreviousOptionIntent(),
-    SingleActivator(LogicalKeyboardKey.arrowDown):
-        AutocompleteNextOptionIntent(),
+    SingleActivator(LogicalKeyboardKey.arrowUp): AutocompletePreviousOptionIntent(),
+    SingleActivator(LogicalKeyboardKey.arrowDown): AutocompleteNextOptionIntent(),
   };
 
   bool get _canShowOptionsView {
-    return _focusNode.hasFocus && _selection == null && _options.isNotEmpty;
+    return _focusNode.hasFocus && _options.isNotEmpty;
   }
 
   Future<void> _updateOptionsViewVisibility() async {
@@ -133,8 +116,7 @@ class _AppRawAutocompleteState<T extends Object>
     _options = options;
     _updateHighlight(_highlightedOptionIndex.value);
     final selection = _selection;
-    if (selection != null &&
-        value.text != widget.displayStringForOption(selection)) {
+    if (selection != null && value.text != widget.displayStringForOption(selection)) {
       _selection = null;
     }
 
@@ -165,21 +147,20 @@ class _AppRawAutocompleteState<T extends Object>
   }
 
   void _updateHighlight(int newIndex) {
-    _highlightedOptionIndex.value =
-        _options.isEmpty ? 0 : newIndex % _options.length;
+    _highlightedOptionIndex.value = _options.isEmpty ? 0 : newIndex % _options.length;
   }
 
   void _highlightPreviousOption(AutocompletePreviousOptionIntent intent) {
-    assert(_canShowOptionsView);
+    assert(_canShowOptionsView, '');
     _updateOptionsViewVisibility();
-    assert(_optionsViewController.isShowing);
+    assert(_optionsViewController.isShowing, '');
     _updateHighlight(_highlightedOptionIndex.value - 1);
   }
 
   void _highlightNextOption(AutocompleteNextOptionIntent intent) {
-    assert(_canShowOptionsView);
+    assert(_canShowOptionsView, '');
     _updateOptionsViewVisibility();
-    assert(_optionsViewController.isShowing);
+    assert(_optionsViewController.isShowing, '');
     _updateHighlight(_highlightedOptionIndex.value + 1);
   }
 
@@ -213,11 +194,7 @@ class _AppRawAutocompleteState<T extends Object>
       child: TextFieldTapRegion(
         child: AutocompleteHighlightedOption(
           highlightIndexNotifier: _highlightedOptionIndex,
-          child: Builder(
-            builder: (BuildContext context) {
-              return widget.optionsViewBuilder(context, _select, _options);
-            },
-          ),
+          child: Builder(builder: (context) => widget.optionsViewBuilder(context, _select, _options)),
         ),
       ),
     );
@@ -226,10 +203,9 @@ class _AppRawAutocompleteState<T extends Object>
   @override
   void initState() {
     super.initState();
-    final initialController = widget.textEditingController ??
-        (_internalTextEditingController =
-            TextEditingController.fromValue(widget.initialValue));
-    initialController.addListener(_onChangedField);
+    (widget.textEditingController ??
+            (_internalTextEditingController = TextEditingController.fromValue(widget.initialValue)))
+        .addListener(_onChangedField);
     widget.focusNode?.addListener(_updateOptionsViewVisibility);
   }
 
@@ -321,8 +297,7 @@ class AutocompleteNextOptionIntent extends Intent {
   const AutocompleteNextOptionIntent();
 }
 
-class AutocompleteHighlightedOption
-    extends InheritedNotifier<ValueNotifier<int>> {
+class AutocompleteHighlightedOption extends InheritedNotifier<ValueNotifier<int>> {
   const AutocompleteHighlightedOption({
     super.key,
     required ValueNotifier<int> highlightIndexNotifier,
@@ -330,10 +305,6 @@ class AutocompleteHighlightedOption
   }) : super(notifier: highlightIndexNotifier);
 
   static int of(BuildContext context) {
-    return context
-            .dependOnInheritedWidgetOfExactType<AutocompleteHighlightedOption>()
-            ?.notifier
-            ?.value ??
-        0;
+    return context.dependOnInheritedWidgetOfExactType<AutocompleteHighlightedOption>()?.notifier?.value ?? 0;
   }
 }
