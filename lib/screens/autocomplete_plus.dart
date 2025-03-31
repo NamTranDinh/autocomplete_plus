@@ -74,47 +74,62 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (widget.decoration?.labelWidget != null || widget.decoration?.label != null)
-          widget.decoration?.labelWidget ??
-              Text(
-                widget.decoration?.label ?? '',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-        const SizedBox(height: 3),
-        AppRawAutocomplete<T>(
-          focusNode: textFieldFocusNode,
-          textEditingController: widget.controller,
-          onSelected: (option) {
-            itemSelected = option;
-            widget.callBacks?.onItemSelected?.call(option);
-            filterController.clear();
-            textFieldFocusNode.unfocus();
-          },
-          displayStringForOption: _displayStringForOption,
-          optionsBuilder: (textEditingValue) async {
-            if (textFieldFocusNode.hasFocus && data.isEmpty) {
-              await getData();
-            }
+    return Focus(
+      onKeyEvent: (focusNode, event) {
+        final data = _getOptionsFiltered();
+        print(data.isEmpty);
+        if (data.isEmpty) return KeyEventResult.ignored;
 
-            return _getOptionsFiltered();
-          },
-          fieldViewBuilder: (context, ctl, focusNode, onFieldSubmitted) {
-            return ValueListenableBuilder(
-              valueListenable: _loadingNotifier,
-              builder: (context, value, child) => _buildTextFormField(context, ctl, focusNode, onFieldSubmitted),
-            );
-          },
-          optionsViewBuilder: buildOptionsViewBuilder,
-        ),
-      ],
+        final currentIndex = itemSelected != null ? data.indexOf(itemSelected!) : 0;
+
+        if (currentIndex >= 0 && currentIndex < data.length - 1) {
+          itemSelected = data[currentIndex + 1];
+        }
+
+        return KeyEventResult.ignored;
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (widget.decoration?.labelWidget != null || widget.decoration?.label != null)
+            widget.decoration?.labelWidget ??
+                Text(
+                  widget.decoration?.label ?? '',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+          const SizedBox(height: 3),
+          AppRawAutocomplete<T>(
+            focusNode: textFieldFocusNode,
+            textEditingController: widget.controller,
+            onSelected: (option) {
+              itemSelected = option;
+              widget.callBacks?.onItemSelected?.call(option);
+              filterController.clear();
+              textFieldFocusNode.unfocus();
+            },
+            displayStringForOption: _displayStringForOption,
+            optionsBuilder: (textEditingValue) async {
+              if (textFieldFocusNode.hasFocus && data.isEmpty) {
+                await getData();
+              }
+
+              return _getOptionsFiltered();
+            },
+            fieldViewBuilder: (context, ctl, focusNode, onFieldSubmitted) {
+              return ValueListenableBuilder(
+                valueListenable: _loadingNotifier,
+                builder: (context, value, child) => _buildTextFormField(context, ctl, focusNode, onFieldSubmitted),
+              );
+            },
+            optionsViewBuilder: buildOptionsViewBuilder,
+          ),
+        ],
+      ),
     );
   }
 
