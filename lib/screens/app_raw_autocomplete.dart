@@ -101,7 +101,6 @@ class _AppRawAutocompleteState<T extends Object> extends State<AppRawAutocomplet
   Future<void> _updateOptionsViewVisibility() async {
     final value = _textEditingController.value;
     final options = await widget.optionsBuilder(value);
-    print(options.length);
     _options = options;
 
     if (_canShowOptionsView) {

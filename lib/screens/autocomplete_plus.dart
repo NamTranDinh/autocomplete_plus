@@ -1,3 +1,4 @@
+import 'package:autocomplete_plus/utils/queue_future.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:autocomplete_plus/models/menu_item_type.dart';
@@ -74,7 +75,7 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
   final keyTextField = GlobalKey();
 
   /// Focus node for the text field.
-  final textFieldFocusNode = FocusNode();
+  final _textFieldFocusNode = FocusNode();
 
   /// Notifier for the loading state.
   final _loadingNotifier = ValueNotifier<bool>(false);
@@ -90,6 +91,8 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
 
   /// Selected item.
   T? itemSelected;
+
+  final _queue = Queue();
 
   @override
   void initState() {
@@ -111,7 +114,7 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
   /// It then calls the [widget.getDataCallBack] to fetch data. If the data is empty and the current page is
   /// beyond the initial page, it disables pagination. Finally, it updates the UI.
   Future<List<T>> getData({required PageConfiguration pageConfigs}) async {
-    if (textFieldFocusNode.hasFocus && pageConfigs.pageNo == widget.initPageNo) {
+    if (_textFieldFocusNode.hasFocus && pageConfigs.pageNo == widget.initPageNo) {
       _loadingNotifier.value = true;
     }
     if (pageConfigs.pageActions == PageActions.disable && pageConfigs.pageNo > widget.initPageNo) return _dataHolder;
@@ -174,19 +177,19 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
               ),
         if (widget.decoration?.labelWidget != null || widget.decoration?.label != null) const SizedBox(height: 3),
         AppRawAutocomplete<T>(
-          focusNode: textFieldFocusNode,
+          focusNode: _textFieldFocusNode,
           textEditingController: widget.controller,
           onSelected: (option) {
             setState(() {
               itemSelected = option;
               widget.callBacks?.onItemSelected?.call(option);
               searchController.clear();
-              textFieldFocusNode.unfocus();
+              _textFieldFocusNode.unfocus();
             });
           },
           optionsBuilder: (textEditingValue) async {
-            if (textFieldFocusNode.hasFocus && _dataHolder.isEmpty) {
-              return await getData(pageConfigs: pageConfiguration);
+            if (_textFieldFocusNode.hasFocus && _dataHolder.isEmpty) {
+              return _queue.add(() async => await getData(pageConfigs: pageConfiguration));
             }
             return _getOptionsFiltered();
           },
@@ -219,9 +222,11 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
               if (_getOptionsFiltered().toList().length - 1 == index && widget.isLoadFromApi) {
                 if (pageConfiguration.pageActions != PageActions.disable) {
                   WidgetsBinding.instance.addPostFrameCallback((timeStamp) => _loadingNotifier.value = true);
-                  pageConfiguration.pageNo += 1;
-                  pageConfiguration.keyWord = searchController.text;
-                  getData(pageConfigs: pageConfiguration);
+                  _queue.add(() async {
+                    pageConfiguration.pageNo += 1;
+                    pageConfiguration.keyWord = searchController.text;
+                    getData(pageConfigs: pageConfiguration);
+                  });
                 }
               }
 
@@ -364,7 +369,8 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
   void dispose() {
     widget.controller.dispose();
     _loadingNotifier.dispose();
-    textFieldFocusNode.dispose();
+    _textFieldFocusNode.dispose();
+    _queue.dispose();
     super.dispose();
   }
 
