@@ -52,6 +52,7 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
     itemSelected = widget.itemSelected;
     filterController = TextEditingController(text: widget.controller.text);
     getData();
+
     super.initState();
   }
 
@@ -74,62 +75,46 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
 
   @override
   Widget build(BuildContext context) {
-    return Focus(
-      onKeyEvent: (focusNode, event) {
-        final data = _getOptionsFiltered();
-        print(data.isEmpty);
-        if (data.isEmpty) return KeyEventResult.ignored;
-
-        final currentIndex = itemSelected != null ? data.indexOf(itemSelected!) : 0;
-
-        if (currentIndex >= 0 && currentIndex < data.length - 1) {
-          itemSelected = data[currentIndex + 1];
-        }
-
-        return KeyEventResult.ignored;
-      },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (widget.decoration?.labelWidget != null || widget.decoration?.label != null)
-            widget.decoration?.labelWidget ??
-                Text(
-                  widget.decoration?.label ?? '',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                  ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (widget.decoration?.labelWidget != null || widget.decoration?.label != null)
+          widget.decoration?.labelWidget ??
+              Text(
+                widget.decoration?.label ?? '',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
                 ),
-          const SizedBox(height: 3),
-          AppRawAutocomplete<T>(
-            focusNode: textFieldFocusNode,
-            textEditingController: widget.controller,
-            onSelected: (option) {
-              itemSelected = option;
-              widget.callBacks?.onItemSelected?.call(option);
-              filterController.clear();
-              textFieldFocusNode.unfocus();
-            },
-            displayStringForOption: _displayStringForOption,
-            optionsBuilder: (textEditingValue) async {
-              if (textFieldFocusNode.hasFocus && data.isEmpty) {
-                await getData();
-              }
-
-              return _getOptionsFiltered();
-            },
-            fieldViewBuilder: (context, ctl, focusNode, onFieldSubmitted) {
-              return ValueListenableBuilder(
-                valueListenable: _loadingNotifier,
-                builder: (context, value, child) => _buildTextFormField(context, ctl, focusNode, onFieldSubmitted),
-              );
-            },
-            optionsViewBuilder: buildOptionsViewBuilder,
-          ),
-        ],
-      ),
+              ),
+        const SizedBox(height: 3),
+        AppRawAutocomplete<T>(
+          focusNode: textFieldFocusNode,
+          textEditingController: widget.controller,
+          onSelected: (option) {
+            itemSelected = option;
+            widget.callBacks?.onItemSelected?.call(option);
+            filterController.clear();
+            textFieldFocusNode.unfocus();
+          },
+          displayStringForOption: _displayStringForOption,
+          optionsBuilder: (textEditingValue) async {
+            if (textFieldFocusNode.hasFocus && data.isEmpty) {
+              await getData();
+            }
+            return _getOptionsFiltered();
+          },
+          fieldViewBuilder: (context, ctl, focusNode, onFieldSubmitted) {
+            return ValueListenableBuilder(
+              valueListenable: _loadingNotifier,
+              builder: (context, value, child) => _buildTextFormField(context, ctl, focusNode, onFieldSubmitted),
+            );
+          },
+          optionsViewBuilder: buildOptionsViewBuilder,
+        ),
+      ],
     );
   }
 
@@ -154,29 +139,24 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
         margin: const EdgeInsets.symmetric(vertical: 4),
         padding: const EdgeInsets.all(8),
         decoration: buildBoxDecoration(),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Theme(
-            data: ThemeData(scrollbarTheme: const ScrollbarThemeData(thickness: WidgetStatePropertyAll(2))),
-            child: ListView.separated(
-              shrinkWrap: true,
-              itemCount: options.toList().length,
-              itemBuilder: (context, index) {
-                return OptionViewItem<T>(
-                  key: ValueKey(itemSelected?.itemCode() ?? ''),
-                  keyTextField: keyTextField,
-                  option: options.toList()[index],
-                  onSelected: (p0) => onSelected(p0),
-                  itemSelected: itemSelected,
-                );
-              },
-              separatorBuilder: (context, index) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: .5),
-                child: Divider(
-                  height: 1,
-                  color: Theme.of(context).dividerColor.withValues(alpha: .1),
-                ),
-              ),
+        child: ListView.separated(
+          padding: EdgeInsets.zero,
+          shrinkWrap: true,
+          itemCount: options.toList().length,
+          itemBuilder: (context, index) {
+            return OptionViewItem<T>(
+              // key: ValueKey(itemSelected?.itemCode() ?? ''),
+              keyTextField: keyTextField,
+              option: options.toList()[index],
+              onSelected: (p0) => onSelected(p0),
+              itemSelected: itemSelected,
+            );
+          },
+          separatorBuilder: (context, index) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: .5),
+            child: Divider(
+              height: 1,
+              color: Theme.of(context).dividerColor.withValues(alpha: .1),
             ),
           ),
         ),
@@ -200,7 +180,7 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
     );
   }
 
-  TextFormField _buildTextFormField(
+  Widget _buildTextFormField(
     BuildContext context,
     TextEditingController textEditingController,
     FocusNode focusNode,
