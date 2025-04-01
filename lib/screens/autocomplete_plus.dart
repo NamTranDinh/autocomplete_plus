@@ -1,11 +1,12 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:autocomplete_plus/models/menu_item_type.dart';
 import 'package:autocomplete_plus/screens/app_raw_autocomplete.dart';
+import 'package:autocomplete_plus/screens/substring_higlight.dart';
 import 'package:autocomplete_plus/utils/debounce.dart';
 import 'package:autocomplete_plus/utils/extensions.dart';
 import 'package:autocomplete_plus/utils/helpers.dart';
+import 'package:autocomplete_plus/utils/page_configuration.dart';
 import 'package:autocomplete_plus/utils/ultis.dart';
 
 class AutocompletePlus<T extends MenuItemType> extends StatefulWidget {
@@ -13,21 +14,45 @@ class AutocompletePlus<T extends MenuItemType> extends StatefulWidget {
     super.key,
     required this.getDataCallBack,
     required this.controller,
+    required this.isLoadFromApi,
     this.itemSelected,
     this.decoration,
     this.validator,
     this.autoValidateMode,
     this.inputFormatters,
     this.callBacks,
-  });
+    this.initPageNo = 1,
+    this.initPageSize = 20,
+  }) : assert(initPageSize >= 20, 'Not support for pageSize < 20');
 
+  /// init page number for list data. default is 1
+  final int initPageNo;
+
+  /// init page size for list data. default is 20
+  final int initPageSize;
+
+  /// is load data from api. default is false
+  final bool isLoadFromApi;
+
+  /// get data from callback
   final GetDataCallback<T> getDataCallBack;
+
+  /// item selected default.
   final T? itemSelected;
+
+  /// controller for text field.
   final TextEditingController controller;
+
+  /// AutocompletePlusDecoration for decoration.
   final AutocompletePlusDecoration? decoration;
 
+  /// Auto validate Mode for text field.
   final AutovalidateMode? autoValidateMode;
+
+  /// TextInputFormatter for text field.
   final List<TextInputFormatter>? inputFormatters;
+
+  /// validator for text field.
   final String? Function(String? value)? validator;
 
   final AutoCompletePlusCallBacks<T>? callBacks;
@@ -38,40 +63,90 @@ class AutocompletePlus<T extends MenuItemType> extends StatefulWidget {
 
 class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompletePlus<T>>
     with SingleTickerProviderStateMixin {
+  /// Global key for the text field.
   final keyTextField = GlobalKey();
+
+  /// Focus node for the text field.
   final textFieldFocusNode = FocusNode();
+
+  /// Notifier for the loading state.
   final _loadingNotifier = ValueNotifier<bool>(false);
 
+  /// List of data to display.
   final List<T> data = [];
-  late TextEditingController filterController;
 
+  /// Search text editing controller.
+  late TextEditingController searchController;
+
+  /// Page configuration for pagination.
+  late PageConfiguration pageConfiguration;
+
+  /// Selected item.
   T? itemSelected;
 
   @override
   void initState() {
     itemSelected = widget.itemSelected;
-    filterController = TextEditingController(text: widget.controller.text);
-    getData();
+    pageConfiguration = PageConfiguration(
+      pageNo: widget.initPageNo,
+      pageSize: widget.initPageSize,
+      keyWord: widget.controller.text,
+    );
+    searchController = TextEditingController(text: widget.controller.text);
 
+    getData(pageConfigs: pageConfiguration);
     super.initState();
   }
 
-  Future<void> getData() async {
-    if (textFieldFocusNode.hasFocus) {
+  /// Asynchronously fetches data based on the provided [pageConfigs].
+  ///
+  /// This method checks if the text field has focus and if the current page is the initial page.
+  /// If so, it sets the loading state to true. It also checks if the pagination should be disabled.
+  /// It then calls the [widget.getDataCallBack] to fetch data. If the data is empty and the current page is
+  /// beyond the initial page, it disables pagination. Finally, it updates the UI.
+  Future<void> getData({required PageConfiguration pageConfigs}) async {
+    if (textFieldFocusNode.hasFocus && pageConfigs.pageNo == widget.initPageNo) {
       _loadingNotifier.value = true;
     }
-    if (kDebugMode) await Future.delayed(const Duration(seconds: 1));
+    if (pageConfigs.pageActions == PageActions.disable && pageConfigs.pageNo > widget.initPageNo) return;
     DebounceHelper().run(
-      () async => widget.getDataCallBack.call().then(
-            (value) => data
+      () async => widget.getDataCallBack.call(pageConfigs.pageNo, pageConfigs.pageSize, pageConfigs.keyWord).then(
+        (value) {
+          if (value.isEmpty && pageConfigs.pageNo > widget.initPageNo) {
+            pageConfigs.pageActions = PageActions.disable;
+            return;
+          }
+
+          if (pageConfigs.pageNo == widget.initPageNo) {
+            data
               ..clear()
-              ..addAll(value),
-          ),
+              ..addAll(value);
+          } else {
+            data.addAll(value);
+          }
+          setState(() {});
+        },
+      ),
     );
-    if (textFieldFocusNode.hasFocus) {
+    if (_loadingNotifier.value) {
       _loadingNotifier.value = false;
     }
   }
+
+  /// Filters the list of options based on the current search text.
+  ///
+  /// This method returns a list of options (`List<T>`) that match the current search
+  /// criteria. It filters the `data` list, keeping only the items whose `itemName`
+  /// contains the search text (case-insensitive and diacritics-insensitive).
+  List<T> _getOptionsFiltered() => data.where(
+        (option) {
+          return option
+              .itemName()
+              .removeDiacritics
+              .toLowerCase()
+              .contains(searchController.text.removeDiacritics.toLowerCase());
+        },
+      ).toList();
 
   @override
   Widget build(BuildContext context) {
@@ -84,10 +159,7 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
                 widget.decoration?.label ?? '',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w400,
-                ),
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
               ),
         const SizedBox(height: 3),
         AppRawAutocomplete<T>(
@@ -96,39 +168,24 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
           onSelected: (option) {
             itemSelected = option;
             widget.callBacks?.onItemSelected?.call(option);
-            filterController.clear();
+            searchController.clear();
             textFieldFocusNode.unfocus();
           },
-          displayStringForOption: _displayStringForOption,
           optionsBuilder: (textEditingValue) async {
             if (textFieldFocusNode.hasFocus && data.isEmpty) {
-              await getData();
+              await getData(pageConfigs: pageConfiguration);
             }
             return _getOptionsFiltered();
           },
-          fieldViewBuilder: (context, ctl, focusNode, onFieldSubmitted) {
-            return ValueListenableBuilder(
-              valueListenable: _loadingNotifier,
-              builder: (context, value, child) => _buildTextFormField(context, ctl, focusNode, onFieldSubmitted),
-            );
-          },
+          fieldViewBuilder: _buildTextFormField,
           optionsViewBuilder: buildOptionsViewBuilder,
+          displayStringForOption: _displayStringForOption,
         ),
       ],
     );
   }
 
-  List<T> _getOptionsFiltered() => data.where(
-        (option) {
-          return option
-              .itemName()
-              .removeDiacritics
-              .toLowerCase()
-              .contains(filterController.text.removeDiacritics.toLowerCase());
-        },
-      ).toList();
-
-  Widget buildOptionsViewBuilder(BuildContext context, Function(T option) onSelected, Iterable<T> options) {
+  Widget buildOptionsViewBuilder(BuildContext context, Function(T option) onSelected, Iterable<T> _) {
     return Align(
       alignment: Alignment.topLeft,
       child: Container(
@@ -139,24 +196,37 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
         margin: const EdgeInsets.symmetric(vertical: 4),
         padding: const EdgeInsets.all(8),
         decoration: buildBoxDecoration(),
-        child: ListView.separated(
-          padding: EdgeInsets.zero,
-          shrinkWrap: true,
-          itemCount: options.toList().length,
-          itemBuilder: (context, index) {
-            return OptionViewItem<T>(
-              // key: ValueKey(itemSelected?.itemCode() ?? ''),
-              keyTextField: keyTextField,
-              option: options.toList()[index],
-              onSelected: (p0) => onSelected(p0),
-              itemSelected: itemSelected,
-            );
-          },
-          separatorBuilder: (context, index) => Padding(
-            padding: const EdgeInsets.symmetric(vertical: .5),
-            child: Divider(
-              height: 1,
-              color: Theme.of(context).dividerColor.withValues(alpha: .1),
+        child: Theme(
+          data: ThemeData(scrollbarTheme: const ScrollbarThemeData(thickness: WidgetStatePropertyAll(2))),
+          child: ListView.separated(
+            padding: EdgeInsets.zero,
+            shrinkWrap: true,
+            itemCount: _getOptionsFiltered().toList().length,
+            itemBuilder: (context, index) {
+              if (_getOptionsFiltered().toList().length - 1 == index && widget.isLoadFromApi) {
+                if (pageConfiguration.pageActions != PageActions.disable) {
+                  pageConfiguration.pageNo += 1;
+                  pageConfiguration.keyWord = searchController.text;
+                  getData(pageConfigs: pageConfiguration);
+                }
+              }
+
+              return OptionViewItem<T>(
+                key: ValueKey(itemSelected?.itemCode() ?? ''),
+                keyTextField: keyTextField,
+                option: _getOptionsFiltered().toList()[index],
+                onSelected: (p0) => onSelected(p0),
+                itemSelected: itemSelected,
+                term: searchController.text.trim() == '' ? widget.controller.text : searchController.text,
+                index: index + 1,
+              );
+            },
+            separatorBuilder: (context, index) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: .5),
+              child: Divider(
+                height: 1,
+                color: Theme.of(context).dividerColor.withValues(alpha: .1),
+              ),
             ),
           ),
         ),
@@ -186,41 +256,53 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
     FocusNode focusNode,
     VoidCallback onFieldSubmitted,
   ) {
-    return TextFormField(
-      key: keyTextField,
-      controller: textEditingController,
-      focusNode: focusNode,
-      validator: widget.validator,
-      keyboardType: TextInputType.text,
-      scrollPadding: const EdgeInsets.only(bottom: 350),
-      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
-      textInputAction: TextInputAction.done,
-      autovalidateMode: widget.autoValidateMode,
-      inputFormatters: widget.inputFormatters,
-      decoration: _buildInputDecoration(textEditingController, context),
-      onTap: () {
-        textEditingController.selection = TextSelection(
-          baseOffset: 0,
-          extentOffset: textEditingController.value.text.length,
-        );
-      },
-      onTapOutside: (event) => widget.callBacks?.onTapOutSide?.call(event),
-      onEditingComplete: () {
-        if (itemSelected != null) widget.callBacks?.onItemSelected?.call(itemSelected!);
-      },
-      onFieldSubmitted: (value) {
-        onFieldSubmitted();
-        if (itemSelected != null) widget.callBacks?.onItemSelected?.call(itemSelected!);
-      },
-      onSaved: (newValue) {
-        if (itemSelected != null) widget.callBacks?.onItemSelected?.call(itemSelected!);
-      },
-      onChanged: (value) {
-        filterController.text = textEditingController.text;
-        widget.callBacks?.onChanged?.call(value);
-        if (data.isNotEmpty) itemSelected = _getOptionsFiltered().first;
-        DebounceHelper().run(() => setState(() {}));
-      },
+    return ValueListenableBuilder(
+      valueListenable: _loadingNotifier,
+      builder: (context, value, child) => TextFormField(
+        key: keyTextField,
+        controller: textEditingController,
+        focusNode: focusNode,
+        validator: widget.validator,
+        keyboardType: TextInputType.text,
+        scrollPadding: const EdgeInsets.only(bottom: 350),
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
+        textInputAction: TextInputAction.done,
+        autovalidateMode: widget.autoValidateMode,
+        inputFormatters: widget.inputFormatters,
+        decoration: _buildInputDecoration(textEditingController, context),
+        onTap: () {
+          textEditingController.selection = TextSelection(
+            baseOffset: 0,
+            extentOffset: textEditingController.value.text.length,
+          );
+        },
+        onTapOutside: (event) {
+          focusNode.unfocus();
+          widget.callBacks?.onTapOutSide?.call(event);
+        },
+        onEditingComplete: () {
+          if (itemSelected != null) widget.callBacks?.onItemSelected?.call(itemSelected!);
+        },
+        onFieldSubmitted: (value) {
+          onFieldSubmitted();
+          if (itemSelected != null) widget.callBacks?.onItemSelected?.call(itemSelected!);
+        },
+        onSaved: (newValue) {
+          if (itemSelected != null) widget.callBacks?.onItemSelected?.call(itemSelected!);
+        },
+        onChanged: (value) {
+          searchController.text = textEditingController.text;
+          widget.callBacks?.onChanged?.call(value);
+          if (data.isNotEmpty) itemSelected = _getOptionsFiltered().first;
+          DebounceHelper().run(
+            () => setState(() {
+              pageConfiguration.pageNo = widget.initPageNo;
+              pageConfiguration.pageActions = PageActions.refresh;
+              getData(pageConfigs: pageConfiguration);
+            }),
+          );
+        },
+      ),
     );
   }
 
@@ -229,10 +311,11 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
       prefixIcon: widget.decoration?.prefixIcon,
       suffixIcon: _loadingNotifier.value
           ? _buildLoading()
-          : textEditingController.text.trim() != ''
+          : textEditingController.text.trim() != '' || widget.controller.text.trim() != ''
               ? InkWell(
                   onTap: () {
                     textEditingController.clear();
+                    searchController.clear();
                     widget.callBacks?.onItemDeleted?.call();
                   },
                   child: const Icon(Icons.close, color: Colors.black),
@@ -281,12 +364,16 @@ class OptionViewItem<T extends MenuItemType> extends StatelessWidget {
     required this.itemSelected,
     required this.keyTextField,
     required this.onSelected,
+    required this.term,
+    this.index,
   });
 
   final T option;
   final T? itemSelected;
   final GlobalKey keyTextField;
   final Function(T item) onSelected;
+  final String term;
+  final int? index;
 
   @override
   Widget build(BuildContext context) {
@@ -304,9 +391,10 @@ class OptionViewItem<T extends MenuItemType> extends StatelessWidget {
             color:
                 itemSelected?.itemCode() == option.itemCode() ? Colors.grey.withValues(alpha: .2) : Colors.transparent,
           ),
-          child: Text(
-            option.itemName(),
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
+          child: SubstringHighlight(
+            text: '${option.itemCode()} - ${option.itemName()}',
+            term: term,
+            textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
           ),
         ),
       ),

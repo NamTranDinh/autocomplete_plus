@@ -37,10 +37,11 @@ class AutocompletePlusDecoration {
 
 typedef ItemCallback<T> = void Function(T item)?;
 
-typedef GetDataCallback<T> = Future<List<T>> Function();
+typedef GetDataCallback<T> = Future<List<T>> Function(int pageNo, int pageSize, String? keyword);
 
 typedef AutocompleteOptionsBuilder<T extends Object> = FutureOr<Iterable<T>> Function(
-    TextEditingValue textEditingValue);
+  TextEditingValue textEditingValue,
+);
 
 typedef AutocompleteOnSelected<T extends Object> = void Function(T option);
 
@@ -64,3 +65,5 @@ typedef AutocompleteOptionToString<T extends Object> = String Function(
 typedef AutoCompletePlusCallBacks<T extends MenuItemType> = CallbackManager<T>;
 
 enum OptionsViewOpenDirection { up, down }
+
+enum PageActions { refresh, disable }
