@@ -124,6 +124,10 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
           } else {
             data.addAll(value);
           }
+
+          if (value.length < widget.initPageSize) {
+            pageConfigs.pageActions = PageActions.disable;
+          }
           setState(() {});
         },
       ),
@@ -166,10 +170,12 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
           focusNode: textFieldFocusNode,
           textEditingController: widget.controller,
           onSelected: (option) {
-            itemSelected = option;
-            widget.callBacks?.onItemSelected?.call(option);
-            searchController.clear();
-            textFieldFocusNode.unfocus();
+            setState(() {
+              itemSelected = option;
+              widget.callBacks?.onItemSelected?.call(option);
+              searchController.clear();
+              textFieldFocusNode.unfocus();
+            });
           },
           optionsBuilder: (textEditingValue) async {
             if (textFieldFocusNode.hasFocus && data.isEmpty) {
@@ -293,7 +299,7 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
         onChanged: (value) {
           searchController.text = textEditingController.text;
           widget.callBacks?.onChanged?.call(value);
-          if (data.isNotEmpty) itemSelected = _getOptionsFiltered().first;
+          if (_getOptionsFiltered().isNotEmpty) itemSelected = _getOptionsFiltered().first;
           DebounceHelper().run(
             () => setState(() {
               pageConfiguration.pageNo = widget.initPageNo;
@@ -314,9 +320,12 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
           : textEditingController.text.trim() != '' || widget.controller.text.trim() != ''
               ? InkWell(
                   onTap: () {
-                    textEditingController.clear();
-                    searchController.clear();
-                    widget.callBacks?.onItemDeleted?.call();
+                    setState(() {
+                      textEditingController.clear();
+                      searchController.clear();
+                      widget.callBacks?.onItemDeleted?.call();
+                      if (_getOptionsFiltered().isNotEmpty) itemSelected = _getOptionsFiltered().first;
+                    });
                   },
                   child: const Icon(Icons.close, color: Colors.black),
                 )
