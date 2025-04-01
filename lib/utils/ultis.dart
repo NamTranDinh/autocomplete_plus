@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:autocomplete_plus/models/callback_mananger.dart';
+import 'package:autocomplete_plus/utils/callback_mananger.dart';
 import 'package:autocomplete_plus/models/menu_item_type.dart';
 
 class AutocompletePlusDecoration {
