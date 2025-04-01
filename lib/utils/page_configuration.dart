@@ -2,8 +2,8 @@ import 'package:autocomplete_plus/utils/ultis.dart';
 
 class PageConfiguration {
   PageConfiguration({
-    this.pageNo = 0,
-    this.pageSize = 10,
+    this.pageNo = 1,
+    this.pageSize = 20,
     this.keyWord,
     this.pageActions = PageActions.refresh,
   });

@@ -55,6 +55,13 @@ class AutocompletePlus<T extends MenuItemType> extends StatefulWidget {
   /// validator for text field.
   final String? Function(String? value)? validator;
 
+  /// Call back for [onItemSelected], [onFieldSubmit], [onItemDeleted], [onChanged], [onTapOutSide].
+  ///
+  ///  * [onItemSelected]: call back when user selected item in dropdown list.
+  ///  * [onFieldSubmit]: call back when user submit text field.
+  ///  * [onItemDeleted]: call back when user delete item.
+  ///  * [onChanged]: call back when value of text field change.
+  ///  * [onTapOutSide]: call back when user tap outside text field.
   final AutoCompletePlusCallBacks<T>? callBacks;
 
   @override
@@ -73,7 +80,7 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
   final _loadingNotifier = ValueNotifier<bool>(false);
 
   /// List of data to display.
-  final List<T> data = [];
+  final List<T> _dataHolder = [];
 
   /// Search text editing controller.
   late TextEditingController searchController;
@@ -94,7 +101,6 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
     );
     searchController = TextEditingController(text: widget.controller.text);
 
-    getData(pageConfigs: pageConfiguration);
     super.initState();
   }
 
@@ -104,37 +110,38 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
   /// If so, it sets the loading state to true. It also checks if the pagination should be disabled.
   /// It then calls the [widget.getDataCallBack] to fetch data. If the data is empty and the current page is
   /// beyond the initial page, it disables pagination. Finally, it updates the UI.
-  Future<void> getData({required PageConfiguration pageConfigs}) async {
+  Future<List<T>> getData({required PageConfiguration pageConfigs}) async {
     if (textFieldFocusNode.hasFocus && pageConfigs.pageNo == widget.initPageNo) {
       _loadingNotifier.value = true;
     }
-    if (pageConfigs.pageActions == PageActions.disable && pageConfigs.pageNo > widget.initPageNo) return;
-    DebounceHelper().run(
-      () async => widget.getDataCallBack.call(pageConfigs.pageNo, pageConfigs.pageSize, pageConfigs.keyWord).then(
-        (value) {
-          if (value.isEmpty && pageConfigs.pageNo > widget.initPageNo) {
-            pageConfigs.pageActions = PageActions.disable;
-            return;
-          }
+    if (pageConfigs.pageActions == PageActions.disable && pageConfigs.pageNo > widget.initPageNo) return _dataHolder;
 
-          if (pageConfigs.pageNo == widget.initPageNo) {
-            data
-              ..clear()
-              ..addAll(value);
-          } else {
-            data.addAll(value);
-          }
+    await Future.delayed(Duration(seconds: 1));
+    await widget.getDataCallBack.call(pageConfigs.pageNo, pageConfigs.pageSize, pageConfigs.keyWord).then(
+      (value) {
+        if (value.isEmpty && pageConfigs.pageNo > widget.initPageNo) {
+          pageConfigs.pageActions = PageActions.disable;
+          return;
+        }
 
-          if (value.length < widget.initPageSize) {
-            pageConfigs.pageActions = PageActions.disable;
-          }
-          setState(() {});
-        },
-      ),
+        if (pageConfigs.pageNo == widget.initPageNo) {
+          _dataHolder
+            ..clear()
+            ..addAll(value);
+        } else {
+          _dataHolder.addAll(value);
+        }
+
+        if (value.length < widget.initPageSize) {
+          pageConfigs.pageActions = PageActions.disable;
+        }
+        setState(() {});
+      },
     );
     if (_loadingNotifier.value) {
       _loadingNotifier.value = false;
     }
+    return _dataHolder;
   }
 
   /// Filters the list of options based on the current search text.
@@ -142,7 +149,7 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
   /// This method returns a list of options (`List<T>`) that match the current search
   /// criteria. It filters the `data` list, keeping only the items whose `itemName`
   /// contains the search text (case-insensitive and diacritics-insensitive).
-  List<T> _getOptionsFiltered() => data.where(
+  List<T> _getOptionsFiltered() => _dataHolder.where(
         (option) {
           return option
               .itemName()
@@ -165,7 +172,7 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
               ),
-        const SizedBox(height: 3),
+        if (widget.decoration?.labelWidget != null || widget.decoration?.label != null) const SizedBox(height: 3),
         AppRawAutocomplete<T>(
           focusNode: textFieldFocusNode,
           textEditingController: widget.controller,
@@ -178,8 +185,8 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
             });
           },
           optionsBuilder: (textEditingValue) async {
-            if (textFieldFocusNode.hasFocus && data.isEmpty) {
-              await getData(pageConfigs: pageConfiguration);
+            if (textFieldFocusNode.hasFocus && _dataHolder.isEmpty) {
+              return await getData(pageConfigs: pageConfiguration);
             }
             return _getOptionsFiltered();
           },
@@ -211,6 +218,7 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
             itemBuilder: (context, index) {
               if (_getOptionsFiltered().toList().length - 1 == index && widget.isLoadFromApi) {
                 if (pageConfiguration.pageActions != PageActions.disable) {
+                  WidgetsBinding.instance.addPostFrameCallback((timeStamp) => _loadingNotifier.value = true);
                   pageConfiguration.pageNo += 1;
                   pageConfiguration.keyWord = searchController.text;
                   getData(pageConfigs: pageConfiguration);
@@ -229,10 +237,7 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
             },
             separatorBuilder: (context, index) => Padding(
               padding: const EdgeInsets.symmetric(vertical: .5),
-              child: Divider(
-                height: 1,
-                color: Theme.of(context).dividerColor.withValues(alpha: .1),
-              ),
+              child: Divider(height: 1, color: Theme.of(context).dividerColor.withValues(alpha: .1)),
             ),
           ),
         ),
@@ -392,18 +397,19 @@ class OptionViewItem<T extends MenuItemType> extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         onTap: () => onSelected(option),
         child: Container(
-          height: 36,
+          constraints: BoxConstraints(minHeight: 36),
           alignment: Alignment.centerLeft,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
-            color:
-                itemSelected?.itemCode() == option.itemCode() ? Colors.grey.withValues(alpha: .2) : Colors.transparent,
+            color: itemSelected?.itemCode() == option.itemCode()
+                ? Colors.grey.withValues(alpha: 00.2)
+                : Colors.transparent,
           ),
           child: SubstringHighlight(
             text: '${option.itemCode()} - ${option.itemName()}',
             term: term,
-            textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
+            textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400, color: Colors.black),
           ),
         ),
       ),
