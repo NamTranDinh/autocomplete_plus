@@ -24,7 +24,7 @@ class AutocompletePlus<T extends MenuItemType> extends StatefulWidget {
     super.key,
     required this.getDataCallBack,
     required this.controller,
-    required this.isLoadFromApi,
+    this.hasPaging = false,
     this.itemSelected,
     this.decoration,
     this.validator,
@@ -41,8 +41,9 @@ class AutocompletePlus<T extends MenuItemType> extends StatefulWidget {
   /// init page size for list data. default is 20
   final int initPageSize;
 
-  /// is load data from api. default is false
-  final bool isLoadFromApi;
+  /// check use paging. default is false. If [true]: use paging and call API.
+  /// else if [false]: get data one time and not call API when scroll.
+  final bool hasPaging;
 
   /// get data from callback
   final GetDataCallback<T> getDataCallBack;
@@ -229,7 +230,7 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
             shrinkWrap: true,
             itemCount: _getOptionsFiltered().toList().length,
             itemBuilder: (context, index) {
-              if (_getOptionsFiltered().toList().length - 1 == index && widget.isLoadFromApi) {
+              if (_getOptionsFiltered().toList().length - 1 == index && widget.hasPaging) {
                 if (pageConfiguration.pageActions != PageActions.disable) {
                   WidgetsBinding.instance.addPostFrameCallback((timeStamp) => _loadingNotifier.value = true);
                   _queue.add(() async {
