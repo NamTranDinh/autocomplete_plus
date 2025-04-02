@@ -8,17 +8,12 @@ issue_tracker: https://github.com/NamTranDinh/autocomplete_plus/issues
 topics:
   - autocomplete
   - infinite-scroll
-  - api
   - suggestion
-  - widget
-  - flutter
 keywords:
   - autocomplete
   - suggestion
   - infinite scrolling
-  - API
   - search
-  - dynamic
 
 environment:
   sdk: '>=3.6.0 <4.0.0'
