@@ -1,6 +1,6 @@
 name: autocomplete_plus
 description: "Effortless API-driven autocomplete for Flutter, featuring seamless infinite scrolling to handle massive datasets with ease."
-version: 0.1.0
+version: 0.0.1
 homepage: https://github.com/NamTranDinh/autocomplete_plus
 documentation: https://github.com/NamTranDinh/autocomplete_plus/blob/main/README.md
 repository: https://github.com/NamTranDinh/autocomplete_plus
