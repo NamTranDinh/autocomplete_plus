@@ -1,4 +1,5 @@
 import 'package:autocomplete_plus/utils/queue_future.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:autocomplete_plus/models/menu_item_type.dart';
@@ -130,7 +131,13 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
     }
     if (pageConfigs.pageActions == PageActions.disable && pageConfigs.pageNo > widget.initPageNo) return _dataHolder;
 
-    await Future.delayed(Duration(seconds: 1));
+    /// Delays the execution by 1 second when the app is in debug mode.
+    ///
+    /// This delay is added to simulate network latency and visually demonstrate
+    /// loading states in debug environments. It is only applied when the
+    /// [kDebugMode] flag is true. In release builds, this delay does not
+    /// occur.
+    if (kDebugMode) await Future.delayed(Duration(seconds: 1));
     await widget.getDataCallBack.call(pageConfigs.pageNo, pageConfigs.pageSize, pageConfigs.keyWord).then(
       (value) {
         if (value.isEmpty && pageConfigs.pageNo > widget.initPageNo) {
