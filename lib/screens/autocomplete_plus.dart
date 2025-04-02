@@ -12,12 +12,29 @@ import 'package:autocomplete_plus/utils/page_configuration.dart';
 import 'package:autocomplete_plus/utils/ultis.dart';
 
 /// {@template AutocompletePlus}
-/// A customizable autocomplete widget that enhances the basic functionality
-/// of a text field by providing a list of suggestions based on user input.
+/// The `AutocompletePlus` widget enhances the standard Flutter text field by providing an autocomplete
+/// functionality with a customizable dropdown of suggestions. It is designed to be flexible and
+/// integrates seamlessly into Flutter applications, offering features like:
 ///
-/// This widget supports loading data from an API, pagination, and various
-/// customization options for styling and behavior.
+/// - **Data Fetching**: Supports fetching data asynchronously from a callback function, allowing for
+///   integration with various data sources, including APIs and local databases.
+/// - **Pagination**: Efficiently handles large datasets by loading data in chunks, only fetching the
+///   next set of items when the user scrolls to the end of the list.
+/// - **Customizable Styling**: Offers a wide range of customization options for the text field and
+///   the dropdown, allowing you to tailor the widget's appearance to fit your app's design.
+/// - **Validation**: Supports Flutter's form validation, ensuring that the user's input meets your
+///   application's requirements.
+/// - **Callbacks**: Provides callbacks for various events, such as item selection, field submission,
+///   text change, and taps outside the field, giving you complete control over the widget's behavior.
+/// - **Debouncing**: Includes debouncing to limit API calls or update operations while the user is
+///   typing, reducing unnecessary network traffic or UI updates.
+/// - **Item Highlighting**: Highlights the matching portion of the search term within the suggestion items.
+/// - **Queueing**: Uses a queue to manage asynchronous operations, ensuring that data fetching and
+///   UI updates are handled in the correct order.
 ///
+/// This `AutocompletePlus` widget is ideal for scenarios where you need to present a list of
+/// suggestions based on user input, such as search bars, input fields for selecting from a list, or
+/// any other situation where autocompletion would enhance the user experience.
 /// [T] is the type of the menu items, which must extend [MenuItemType].
 /// {@endtemplate}
 class AutocompletePlus<T extends MenuItemType> extends StatefulWidget {
@@ -92,7 +109,7 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
   final _loadingNotifier = ValueNotifier<bool>(false);
 
   /// List of data to display.
-  final List<T> _dataHolder = [];
+  final _dataHolder = <int, List<T>>{};
 
   /// Search text editing controller.
   late TextEditingController searchController;
@@ -119,13 +136,19 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
     super.initState();
   }
 
+  List<T> mergeLists(Map<int, List<T>> dataHolder) {
+    return dataHolder.values.expand((list) => list).toList();
+  }
+
   /// Asynchronously fetches data based on the provided [pageConfigs].
   ///
   /// This method checks if the text field has focus and if the current page is the initial page.
   /// If so, it sets the loading state to true. It also checks if the pagination should be disabled.
   /// It then calls the [widget.getDataCallBack] to fetch data. If the data is empty and the current page is
   /// beyond the initial page, it disables pagination. Finally, it updates the UI.
-  Future<List<T>> getData({required PageConfiguration pageConfigs}) async {
+  Future<Map<int, List<T>>> getData({required PageConfiguration pageConfigs}) async {
+    if (_dataHolder.keys.contains(pageConfigs.pageNo)) return _dataHolder;
+
     if (_textFieldFocusNode.hasFocus && pageConfigs.pageNo == widget.initPageNo) {
       _loadingNotifier.value = true;
     }
@@ -137,20 +160,15 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
     /// loading states in debug environments. It is only applied when the
     /// [kDebugMode] flag is true. In release builds, this delay does not
     /// occur.
-    if (kDebugMode) await Future.delayed(Duration(seconds: 1));
+    if (kDebugMode) await Future.delayed(const Duration(seconds: 1));
     await widget.getDataCallBack.call(pageConfigs.pageNo, pageConfigs.pageSize, pageConfigs.keyWord).then(
       (value) {
-        if (value.isEmpty && pageConfigs.pageNo > widget.initPageNo) {
-          pageConfigs.pageActions = PageActions.disable;
-          return;
-        }
-
         if (pageConfigs.pageNo == widget.initPageNo) {
           _dataHolder
             ..clear()
-            ..addAll(value);
+            ..addAll({pageConfigs.pageNo: value});
         } else {
-          _dataHolder.addAll(value);
+          _dataHolder.addAll({pageConfigs.pageNo: value});
         }
 
         if (value.length < widget.initPageSize) {
@@ -159,9 +177,11 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
         setState(() {});
       },
     );
+
     if (_loadingNotifier.value) {
       _loadingNotifier.value = false;
     }
+    print('${_dataHolder.keys}');
     return _dataHolder;
   }
 
@@ -170,7 +190,7 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
   /// This method returns a list of options (`List<T>`) that match the current search
   /// criteria. It filters the `data` list, keeping only the items whose `itemName`
   /// contains the search text (case-insensitive and diacritics-insensitive).
-  List<T> _getOptionsFiltered() => _dataHolder.where(
+  List<T> _getOptionsFiltered() => mergeLists(_dataHolder).where(
         (option) {
           return option
               .itemName()
@@ -207,8 +227,9 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
           },
           optionsBuilder: (textEditingValue) async {
             if (_textFieldFocusNode.hasFocus && _dataHolder.isEmpty) {
-              return _queue.add(() async => await getData(pageConfigs: pageConfiguration));
+              return _queue.add(() async => mergeLists(await getData(pageConfigs: pageConfiguration)));
             }
+            pageConfiguration.pageActions = PageActions.refresh;
             return _getOptionsFiltered();
           },
           fieldViewBuilder: _buildTextFormField,
@@ -239,12 +260,16 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
             itemBuilder: (context, index) {
               if (_getOptionsFiltered().toList().length - 1 == index && widget.hasPaging) {
                 if (pageConfiguration.pageActions != PageActions.disable) {
-                  WidgetsBinding.instance.addPostFrameCallback((timeStamp) => _loadingNotifier.value = true);
-                  _queue.add(() async {
-                    pageConfiguration.pageNo += 1;
-                    pageConfiguration.keyWord = searchController.text;
-                    getData(pageConfigs: pageConfiguration);
-                  });
+                  if (_isLastPage()) {
+                    pageConfiguration.pageActions = PageActions.disable;
+                  } else {
+                    WidgetsBinding.instance.addPostFrameCallback((timeStamp) => _loadingNotifier.value = true);
+                    _queue.add(() async {
+                      pageConfiguration.pageNo += 1;
+                      pageConfiguration.keyWord = searchController.text;
+                      await getData(pageConfigs: pageConfiguration);
+                    });
+                  }
                 }
               }
 
@@ -328,16 +353,29 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
           searchController.text = textEditingController.text;
           widget.callBacks?.onChanged?.call(value);
           if (_getOptionsFiltered().isNotEmpty) itemSelected = _getOptionsFiltered().first;
-          DebounceHelper().run(
-            () => setState(() {
-              pageConfiguration.pageNo = widget.initPageNo;
-              pageConfiguration.pageActions = PageActions.refresh;
-              getData(pageConfigs: pageConfiguration);
-            }),
-          );
+          // check if the last page number is the last page?
+          if (!_isLastPage()) {
+            DebounceHelper().run(
+              () => setState(() {
+                pageConfiguration.pageNo = widget.initPageNo;
+                pageConfiguration.pageActions = PageActions.refresh;
+                getData(pageConfigs: pageConfiguration);
+              }),
+            );
+          }
         },
       ),
     );
+  }
+
+  /// This method checks if the data holder for the last page is either null
+  /// or if the length of the data on the last page is less than the
+  /// `initPageSize` specified in the widget. If either condition is true, it
+  /// means that the current page is the last page or there are no more items
+  /// to load.
+  bool _isLastPage() {
+    return _dataHolder[_dataHolder.keys.last] == null ||
+        _dataHolder[_dataHolder.keys.last]!.length < widget.initPageSize;
   }
 
   InputDecoration _buildInputDecoration(TextEditingController textEditingController, BuildContext context) {
@@ -444,7 +482,7 @@ class OptionViewItem<T extends MenuItemType> extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         onTap: () => onSelected(option),
         child: Container(
-          constraints: BoxConstraints(minHeight: 36),
+          constraints: const BoxConstraints(minHeight: 36),
           alignment: Alignment.centerLeft,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
           decoration: BoxDecoration(
