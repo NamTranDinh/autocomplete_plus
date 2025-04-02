@@ -7,7 +7,8 @@ import 'package:autocomplete_plus/models/menu_item_type.dart';
 /// Represents the decoration of the AutocompletePlus widget.
 class AutocompletePlusDecoration {
   AutocompletePlusDecoration({
-    this.hintText,
+    this.hintText = 'Enter',
+    this.hintStyle,
     this.suffixIcon,
     this.prefixIcon,
     this.label,
@@ -28,7 +29,10 @@ class AutocompletePlusDecoration {
   final Widget? labelWidget;
 
   /// The text to display as the hint for the field.
-  final String? hintText;
+  final String hintText;
+
+  /// The text style to display as the hint for the field.
+  final TextStyle? hintStyle;
 
   /// The widget to display as the suffix icon for the field.
   final Widget? suffixIcon;
