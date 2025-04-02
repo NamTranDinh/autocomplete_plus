@@ -43,6 +43,7 @@ class AutocompletePlus<T extends MenuItemType> extends StatefulWidget {
     required this.getDataCallBack,
     required this.controller,
     this.hasPaging = false,
+    this.showHighlight = true,
     this.itemSelected,
     this.decoration,
     this.validator,
@@ -62,6 +63,10 @@ class AutocompletePlus<T extends MenuItemType> extends StatefulWidget {
   /// check use paging. default is false. If [true]: use paging and call API.
   /// else if [false]: get data one time and not call API when scroll.
   final bool hasPaging;
+
+  /// check show highlight text when searching. Default [true]
+  ///  if [false]: not show highlight.
+  final bool showHighlight;
 
   /// get data from callback
   final GetDataCallback<T> getDataCallBack;
@@ -279,7 +284,11 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
                 option: _getOptionsFiltered().toList()[index],
                 onSelected: (p0) => onSelected(p0),
                 itemSelected: itemSelected,
-                term: searchController.text.trim() == '' ? widget.controller.text : searchController.text,
+                term: widget.showHighlight
+                    ? searchController.text.trim() == ''
+                        ? widget.controller.text
+                        : searchController.text
+                    : '',
                 index: index + 1,
               );
             },
