@@ -10,6 +10,15 @@ import 'package:autocomplete_plus/utils/helpers.dart';
 import 'package:autocomplete_plus/utils/page_configuration.dart';
 import 'package:autocomplete_plus/utils/ultis.dart';
 
+/// {@template AutocompletePlus}
+/// A customizable autocomplete widget that enhances the basic functionality
+/// of a text field by providing a list of suggestions based on user input.
+///
+/// This widget supports loading data from an API, pagination, and various
+/// customization options for styling and behavior.
+///
+/// [T] is the type of the menu items, which must extend [MenuItemType].
+/// {@endtemplate}
 class AutocompletePlus<T extends MenuItemType> extends StatefulWidget {
   const AutocompletePlus({
     super.key,
@@ -92,6 +101,7 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
   /// Selected item.
   T? itemSelected;
 
+  /// Queue for handling asynchronous operations.
   final _queue = Queue();
 
   @override
@@ -377,6 +387,11 @@ class _AutocompletePlusState<T extends MenuItemType> extends State<AutocompleteP
   static String _displayStringForOption<T extends MenuItemType>(T option) => option.itemName();
 }
 
+/// A widget that represents a single item in the list of options within the [AutocompletePlus] dropdown.
+///
+/// This widget is responsible for displaying the item's text and highlighting any substrings that match
+/// the current search term. It also handles the selection of the item and updates the UI accordingly.
+///
 class OptionViewItem<T extends MenuItemType> extends StatelessWidget {
   const OptionViewItem({
     super.key,
@@ -388,11 +403,29 @@ class OptionViewItem<T extends MenuItemType> extends StatelessWidget {
     this.index,
   });
 
+  /// The menu item that this widget represents.
   final T option;
+
+  /// The currently selected item, if any.
   final T? itemSelected;
+
+  /// The global key for the text field associated with this autocomplete widget.
   final GlobalKey keyTextField;
+
+  /// A callback function that is called when this item is selected.
+  ///
+  /// This function takes a single argument, `item`, which represents the selected menu item of type `T`.
   final Function(T item) onSelected;
+
+  /// The search term that is used to filter the menu items.
+  ///
+  /// This term is used to highlight matching substrings within the menu item's text.
   final String term;
+
+  /// The index of this item within the list of options.
+  ///
+  /// This can be used to determine the position of this item in the list,
+  /// starting from 1 for the first item, 2 for the second, and so on.
   final int? index;
 
   @override

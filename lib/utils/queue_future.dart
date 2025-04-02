@@ -13,10 +13,10 @@ class _QueuedFuture<T> {
   Future<void> execute() async {
     try {
       T result;
-      Timer? timoutTimer;
+      Timer? timeoutTimer;
 
       if (timeout != null) {
-        timoutTimer = Timer(timeout!, () {
+        timeoutTimer = Timer(timeout!, () {
           _timedOut = true;
           if (onComplete != null) {
             onComplete!();
@@ -31,7 +31,7 @@ class _QueuedFuture<T> {
       }
 
       //Make sure not to execute the next command until this future has completed
-      timoutTimer?.cancel();
+      timeoutTimer?.cancel();
       await Future.microtask(() {});
     } catch (e, stack) {
       completer.completeError(e, stack);
